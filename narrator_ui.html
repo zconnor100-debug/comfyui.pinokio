@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Video Narrator</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#07070e;color:#ddd;min-height:100vh}
+.wrap{max-width:900px;margin:0 auto;padding:36px 20px}
+h1{font-size:2rem;font-weight:800;background:linear-gradient(135deg,#a855f7,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sub{color:#555;font-size:.85rem;margin-bottom:30px;margin-top:5px}
+.card{background:#0d0d1a;border:1px solid #1a1a2e;border-radius:14px;padding:22px;margin-bottom:16px}
+.tab-row{display:flex;gap:0;border-bottom:2px solid #1a1a2e;margin-bottom:20px}
+.tab{padding:10px 20px;font-size:.88rem;font-weight:600;color:#666;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+.tab.active{color:#a855f7;border-bottom-color:#a855f7}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+label{display:block;font-size:.75rem;font-weight:700;color:#777;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+textarea,input,select{width:100%;background:#07070e;border:1px solid #1e1e30;border-radius:9px;color:#ddd;padding:10px 13px;font-size:.92rem;font-family:inherit;outline:none;transition:border-color .2s}
+textarea:focus,input:focus,select:focus{border-color:#7c3aed}
+textarea{resize:vertical;min-height:80px}
+.field{margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.tip{font-size:.73rem;color:#555;margin-top:4px;font-style:italic}
+.btn{padding:10px 22px;border:none;border-radius:9px;font-size:.9rem;font-weight:700;cursor:pointer;transition:opacity .2s}
+.btn-primary{background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff}
+.btn-secondary{background:#1a1a2e;color:#aaa;border:1px solid #2a2a40}
+.btn-danger{background:#3f1010;color:#f87171;border:1px solid #6f1a1a}
+.btn:hover{opacity:.85}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-full{width:100%;padding:14px}
+/* Scene builder */
+.scene-card{background:#070710;border:1px solid #1e1e30;border-radius:10px;padding:16px;margin-bottom:10px;position:relative}
+.scene-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.scene-num{background:rgba(124,58,237,.2);color:#a855f7;border-radius:6px;padding:3px 10px;font-size:.78rem;font-weight:700}
+.scene-title-input{flex:1;font-size:.9rem}
+.scene-remove{position:absolute;top:12px;right:12px;background:none;border:none;color:#555;cursor:pointer;font-size:1rem;padding:2px 6px;border-radius:4px}
+.scene-remove:hover{color:#f87171;background:rgba(239,68,68,.1)}
+.add-scene-btn{width:100%;padding:10px;border:2px dashed #2a2a40;background:none;color:#555;border-radius:10px;cursor:pointer;font-size:.88rem;font-weight:600;transition:all .2s}
+.add-scene-btn:hover{border-color:#7c3aed;color:#a855f7}
+/* Script preview */
+.script-preview{display:none}
+.preview-title{font-size:1.1rem;font-weight:700;color:#a855f7;margin-bottom:14px}
+.preview-scene{border-left:3px solid #2a2a40;padding:10px 14px;margin-bottom:10px;border-radius:0 8px 8px 0}
+.preview-scene-title{font-size:.82rem;font-weight:700;color:#888;margin-bottom:5px}
+.preview-narration{font-size:.88rem;color:#ccc;line-height:1.5}
+.preview-imgprompt{font-size:.75rem;color:#555;margin-top:5px;font-style:italic}
+/* Progress */
+.progress-wrap{display:none}
+.stage-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.pill{padding:3px 11px;border-radius:100px;font-size:.75rem;font-weight:700;background:#131326;color:#555;border:1px solid #1e1e30;transition:all .3s}
+.pill.active{background:rgba(124,58,237,.15);color:#a855f7;border-color:rgba(124,58,237,.4)}
+.pill.done{background:rgba(34,197,94,.08);color:#22c55e;border-color:rgba(34,197,94,.25)}
+.bar-bg{background:#131326;border-radius:100px;height:6px;overflow:hidden;margin:8px 0 6px}
+.bar{height:100%;background:linear-gradient(90deg,#7c3aed,#3b82f6);border-radius:100px;transition:width .5s ease;width:0}
+.prog-msg{font-size:.83rem;color:#666}
+/* Scene grid */
+.scene-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:14px}
+.sgrid-card{background:#07070e;border:1px solid #1e1e30;border-radius:10px;overflow:hidden;transition:border-color .3s}
+.sgrid-card.st-audio{border-color:#1e4a7c}
+.sgrid-card.st-image{border-color:rgba(124,58,237,.5)}
+.sgrid-card.st-video{border-color:rgba(124,58,237,.8);box-shadow:0 0 12px rgba(124,58,237,.15)}
+.sgrid-card.st-assembling{border-color:rgba(251,146,60,.5)}
+.sgrid-card.st-done{border-color:rgba(34,197,94,.4)}
+.sgrid-thumb{width:100%;height:112px;object-fit:cover;display:none;background:#111}
+.sgrid-thumb.visible{display:block}
+.sgrid-body{padding:10px}
+.sgrid-snum{font-size:.7rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.06em}
+.sgrid-stitle{font-size:.82rem;font-weight:600;color:#ccc;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sgrid-status{display:inline-block;padding:2px 9px;border-radius:100px;font-size:.7rem;font-weight:700;margin-top:6px;background:#131326;color:#555}
+.sgrid-card.st-audio .sgrid-status{background:#0d1f35;color:#60a5fa}
+.sgrid-card.st-image .sgrid-status{background:rgba(124,58,237,.15);color:#a855f7}
+.sgrid-card.st-video .sgrid-status,.sgrid-card.st-assembling .sgrid-status{background:rgba(251,146,60,.1);color:#fb923c}
+.sgrid-card.st-done .sgrid-status{background:rgba(34,197,94,.1);color:#22c55e}
+/* Result */
+.result-wrap{display:none}
+video{width:100%;border-radius:10px;background:#000;border:1px solid #1a1a2e}
+.err-card{display:none;background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2)}
+.err-msg{color:#f87171;font-size:.88rem}
+.notice{background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:9px;padding:10px 14px;font-size:.8rem;color:#93c5fd;margin-bottom:14px}
+select option{background:#0d0d1a}
+.divider{border:none;border-top:1px solid #1a1a2e;margin:16px 0}
+input[type=range]{padding:0;height:34px;background:none;border:none;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>AI Video Narrator</h1>
+  <p class="sub">Write your script manually or generate one with Ollama &rarr; narration + visuals + final MP4</p>
+
+  <!-- SCRIPT SECTION -->
+  <div class="card" id="script-section">
+    <div class="tab-row">
+      <div class="tab active" onclick="switchTab('manual')">&#9998; Write Script</div>
+      <div class="tab" onclick="switchTab('ollama')">&#129302; AI Script (Ollama)</div>
+    </div>
+
+    <!-- Manual Script Tab -->
+    <div class="tab-pane active" id="tab-manual">
+      <div class="field">
+        <label>Video Title</label>
+        <input type="text" id="manual-title" placeholder="e.g. The Deep Ocean">
+      </div>
+      <div id="scenes-list"></div>
+      <button class="add-scene-btn" onclick="addScene()">+ Add Scene</button>
+    </div>
+
+    <!-- Ollama Tab -->
+    <div class="tab-pane" id="tab-ollama">
+      <div id="ollama-offline" class="notice" style="display:none">
+        Ollama is not running. Start it with <code>ollama serve</code> and install a model like <code>ollama pull llama3</code>.
+      </div>
+      <div class="field">
+        <label>Video Idea</label>
+        <textarea id="ollama-idea" placeholder="e.g. A short documentary about how deep-sea creatures survive in the dark ocean..."></textarea>
+      </div>
+      <div class="grid3">
+        <div>
+          <label>Ollama Model</label>
+          <select id="ollama-model"><option>llama3</option></select>
+        </div>
+        <div>
+          <label>Style</label>
+          <select id="ollama-style">
+            <option value="documentary">Documentary</option>
+            <option value="cinematic" selected>Cinematic</option>
+            <option value="educational">Educational</option>
+            <option value="storytelling">Storytelling</option>
+            <option value="news">News</option>
+          </select>
+        </div>
+        <div>
+          <label>Scenes</label>
+          <select id="ollama-n">
+            <option value="3">3 scenes</option>
+            <option value="4">4 scenes</option>
+            <option value="5" selected>5 scenes</option>
+            <option value="6">6 scenes</option>
+            <option value="7">7 scenes</option>
+            <option value="8">8 scenes</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-secondary btn-full" id="gen-script-btn" onclick="generateScript()" style="margin-top:6px">
+        Generate Script with Ollama
+      </button>
+    </div>
+  </div>
+
+  <!-- SCRIPT PREVIEW (shown after manual build or Ollama generation) -->
+  <div class="card script-preview" id="script-preview">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="preview-title" id="preview-title">Script Ready</div>
+      <button class="btn btn-secondary" style="font-size:.78rem;padding:5px 12px" onclick="clearScript()">Clear</button>
+    </div>
+    <div id="preview-scenes"></div>
+  </div>
+
+  <!-- GENERATION SETTINGS -->
+  <div class="card" id="gen-settings">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:.95rem;font-weight:700;color:#ccc">Generation Settings</div>
+      <button class="btn btn-secondary" style="font-size:.75rem;padding:4px 12px" onclick="toggleAdvanced()">Advanced</button>
+    </div>
+    <div class="grid2">
+      <div>
+        <label>Image Model</label>
+        <select id="img-model">
+          <option value="sd_xl_base_1.0.safetensors">SDXL Base</option>
+          <option value="sd_xl_turbo_1.0_fp16.safetensors">SDXL Turbo (fast)</option>
+        </select>
+      </div>
+      <div>
+        <label>Video Model (SVD)</label>
+        <select id="vid-model">
+          <option value="svd_xt.safetensors">SVD XT (25 frames)</option>
+          <option value="svd.safetensors">SVD (14 frames)</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div>
+        <label>Narration Voice</label>
+        <select id="voice">
+          <option value="en-US-JennyNeural">Jenny (US Female, warm)</option>
+          <option value="en-US-GuyNeural">Guy (US Male, clear)</option>
+          <option value="en-US-AriaNeural">Aria (US Female, expressive)</option>
+          <option value="en-US-DavisNeural">Davis (US Male, deep)</option>
+          <option value="en-GB-SoniaNeural">Sonia (UK Female)</option>
+          <option value="en-GB-RyanNeural">Ryan (UK Male)</option>
+          <option value="en-AU-NatashaNeural">Natasha (AU Female)</option>
+          <option value="en-IN-NeerjaNeural">Neerja (IN Female)</option>
+        </select>
+      </div>
+      <div>
+        <label>Visual Style</label>
+        <select id="gen-style">
+          <option value="documentary">Documentary</option>
+          <option value="cinematic" selected>Cinematic</option>
+          <option value="educational">Educational</option>
+          <option value="storytelling">Storytelling</option>
+          <option value="news">News</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="advanced-panel" style="display:none;margin-top:14px">
+      <hr class="divider">
+      <div class="grid3">
+        <div>
+          <label>Seed</label>
+          <input type="number" id="seed" value="-1" min="-1">
+          <p class="tip">-1 = random</p>
+        </div>
+        <div>
+          <label>FPS</label>
+          <input type="number" id="fps" value="6" min="1" max="30">
+        </div>
+        <div>
+          <label>Image Steps</label>
+          <input type="number" id="steps" value="20" min="1" max="60">
+        </div>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label>Motion Strength <span id="motion-val" style="color:#a855f7">127</span></label>
+        <input type="range" id="motion" min="1" max="255" value="127" style="margin-top:4px">
+      </div>
+    </div>
+
+    <button class="btn btn-primary btn-full" id="generate-btn" onclick="startGeneration()" style="margin-top:16px">
+      &#9654; Generate Full Video
+    </button>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="card progress-wrap" id="progress-card">
+    <div class="stage-pills">
+      <span class="pill" id="p-tts">Narration Audio</span>
+      <span class="pill" id="p-title">Title Card</span>
+      <span class="pill" id="p-scene">Scene Visuals</span>
+      <span class="pill" id="p-concat">Final Assembly</span>
+    </div>
+    <div class="bar-bg"><div class="bar" id="pbar"></div></div>
+    <div class="prog-msg" id="prog-msg">Starting...</div>
+    <div class="scene-grid" id="scene-grid"></div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="card err-card" id="err-card">
+    <p class="err-msg" id="err-msg"></p>
+  </div>
+
+  <!-- RESULT -->
+  <div class="card result-wrap" id="result-card">
+    <div style="font-size:.9rem;font-weight:700;color:#22c55e;margin-bottom:12px">&#10003; Video Ready</div>
+    <video id="vid-player" controls autoplay loop muted></video>
+    <p style="font-size:.75rem;color:#555;margin-top:8px">Right-click to save as MP4</p>
+  </div>
+</div>
+
+<script>
+// ─── Script state ────────────────────────────────────────────────────────────
+let currentScript = null;
+let sceneCount = 0;
+let ollamaStyle = 'cinematic';
+let activeTab = 'manual';
+
+// ─── Tab switching ────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0 && tab==='manual') || (i===1 && tab==='ollama')));
+  document.getElementById('tab-manual').classList.toggle('active', tab === 'manual');
+  document.getElementById('tab-ollama').classList.toggle('active', tab === 'ollama');
+}
+
+// ─── Manual scene builder ─────────────────────────────────────────────────────
+function addScene(data) {
+  sceneCount++;
+  const idx = sceneCount;
+  const list = document.getElementById('scenes-list');
+  const d = document.createElement('div');
+  d.className = 'scene-card';
+  d.id = `scene-card-${idx}`;
+  d.innerHTML = `
+    <div class="scene-header">
+      <span class="scene-num">Scene ${idx}</span>
+      <input class="scene-title-input" type="text" placeholder="Scene title (optional)" value="${data?.title||''}">
+    </div>
+    <div class="field">
+      <label>Image Prompt</label>
+      <textarea placeholder="Describe what this scene looks like. Be specific: subject, environment, lighting, mood...">${data?.image_prompt||''}</textarea>
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label>Narration</label>
+      <textarea style="min-height:60px" placeholder="What is spoken aloud in this scene. 2-3 sentences.">${data?.narration||''}</textarea>
+    </div>
+    <button class="scene-remove" onclick="removeScene(${idx})" title="Remove scene">&times;</button>`;
+  list.appendChild(d);
+  updateSceneNumbers();
+}
+
+function removeScene(idx) {
+  const el = document.getElementById(`scene-card-${idx}`);
+  if (el) el.remove();
+  updateSceneNumbers();
+}
+
+function updateSceneNumbers() {
+  document.querySelectorAll('.scene-card').forEach((c, i) => {
+    c.querySelector('.scene-num').textContent = `Scene ${i+1}`;
+    c.querySelector('.scene-remove').setAttribute('onclick', `removeScene(${c.id.split('-')[2]})`);
+  });
+}
+
+function getManualScript() {
+  const title = document.getElementById('manual-title').value.trim() || 'My Video';
+  const cards = document.querySelectorAll('.scene-card');
+  if (!cards.length) return null;
+  const scenes = [];
+  cards.forEach((c, i) => {
+    const inputs = c.querySelectorAll('textarea');
+    const titleInput = c.querySelector('.scene-title-input');
+    const img = inputs[0]?.value?.trim() || '';
+    const narr = inputs[1]?.value?.trim() || '';
+    if (img || narr) {
+      scenes.push({ id: i+1, title: titleInput?.value?.trim() || `Scene ${i+1}`,
+                    image_prompt: img, narration: narr });
+    }
+  });
+  if (!scenes.length) return null;
+  return { title, scenes };
+}
+
+// ─── Ollama AI generation ─────────────────────────────────────────────────────
+async function generateScript() {
+  const idea = document.getElementById('ollama-idea').value.trim();
+  if (!idea) { alert('Enter a video idea first.'); return; }
+  const btn = document.getElementById('gen-script-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating with Ollama...';
+  try {
+    const res = await fetch('/ollama/generate', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        idea, n_scenes: parseInt(document.getElementById('ollama-n').value),
+        style: document.getElementById('ollama-style').value,
+        model: document.getElementById('ollama-model').value
+      })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    document.getElementById('gen-style').value = document.getElementById('ollama-style').value;
+    showScript(data.script);
+  } catch(e) {
+    alert('Ollama error: ' + e.message);
+  }
+  btn.disabled = false;
+  btn.textContent = 'Generate Script with Ollama';
+}
+
+// ─── Script preview ─────────────────────────────────────────────────────────
+function showScript(script) {
+  currentScript = script;
+  document.getElementById('preview-title').textContent = script.title || 'Script Ready';
+  const cont = document.getElementById('preview-scenes');
+  cont.innerHTML = '';
+  (script.scenes || []).forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'preview-scene';
+    div.innerHTML = `<div class="preview-scene-title">Scene ${s.id}: ${s.title || ''}</div>
+      <div class="preview-narration">"${s.narration || ''}"</div>
+      <div class="preview-imgprompt">${s.image_prompt || ''}</div>`;
+    cont.appendChild(div);
+  });
+  document.getElementById('script-preview').style.display = 'block';
+}
+
+function clearScript() {
+  currentScript = null;
+  document.getElementById('script-preview').style.display = 'none';
+}
+
+// ─── Advanced settings toggle ─────────────────────────────────────────────────
+function toggleAdvanced() {
+  const p = document.getElementById('advanced-panel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('motion').addEventListener('input', function() {
+    document.getElementById('motion-val').textContent = this.value;
+  });
+  addScene(); // start with one empty scene
+  loadModels();
+  checkOllama();
+});
+
+async function loadModels() {
+  try {
+    const r = await fetch('/comfyui/models');
+    const d = await r.json();
+    if (d.img?.length) {
+      const sel = document.getElementById('img-model');
+      sel.innerHTML = '';
+      d.img.forEach(m => {
+        const o = document.createElement('option');
+        o.value = m; o.textContent = m;
+        if (m.includes('xl_base')) o.selected = true;
+        sel.appendChild(o);
+      });
+    }
+    if (d.vid?.length) {
+      const sel = document.getElementById('vid-model');
+      sel.innerHTML = '';
+      d.vid.forEach(m => {
+        const o = document.createElement('option');
+        o.value = m; o.textContent = m;
+        if (m.includes('svd_xt')) o.selected = true;
+        sel.appendChild(o);
+      });
+    }
+  } catch(e) {}
+}
+
+async function checkOllama() {
+  try {
+    const r = await fetch('/ollama/models');
+    const d = await r.json();
+    if (d.models?.length) {
+      const sel = document.getElementById('ollama-model');
+      sel.innerHTML = '';
+      d.models.forEach(m => {
+        const o = document.createElement('option');
+        o.value = m; o.textContent = m;
+        sel.appendChild(o);
+      });
+    } else {
+      document.getElementById('ollama-offline').style.display = 'block';
+    }
+  } catch(e) {
+    document.getElementById('ollama-offline').style.display = 'block';
+  }
+}
+
+// ─── Start video generation ───────────────────────────────────────────────────
+async function startGeneration() {
+  // Determine script source
+  let script = currentScript;
+  if (!script && activeTab === 'manual') {
+    script = getManualScript();
+    if (!script) { alert('Add at least one scene with an image prompt or narration.'); return; }
+  }
+  if (!script) { alert('Build or generate a script first.'); return; }
+
+  const params = {
+    img_model: document.getElementById('img-model').value,
+    vid_model: document.getElementById('vid-model').value,
+    voice:     document.getElementById('voice').value,
+    style:     document.getElementById('gen-style').value,
+    seed:      parseInt(document.getElementById('seed').value),
+    fps:       parseInt(document.getElementById('fps').value),
+    steps:     parseInt(document.getElementById('steps').value),
+    motion:    parseInt(document.getElementById('motion').value),
+  };
+
+  const btn = document.getElementById('generate-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+  document.getElementById('progress-card').style.display = 'block';
+  document.getElementById('result-card').style.display = 'none';
+  document.getElementById('err-card').style.display = 'none';
+  setProgress(0, 'Starting...');
+  setStage('');
+
+  try {
+    const res = await fetch('/generate', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ script, params })
+    });
+    const data = await res.json();
+    if (data.error) { showErr(data.error); btn.disabled=false; btn.textContent='▶ Generate Full Video'; return; }
+    listenSSE(data.job_id, btn);
+  } catch(e) {
+    showErr('Server error: ' + e.message);
+    btn.disabled=false; btn.textContent='▶ Generate Full Video';
+  }
+}
+
+// ─── SSE listener ─────────────────────────────────────────────────────────────
+function listenSSE(jid, btn) {
+  const es = new EventSource(`/stream/${jid}`);
+  es.onmessage = e => {
+    const job = JSON.parse(e.data);
+    if (job.status === 'not_found') { es.close(); return; }
+    setProgress(job.progress || 0, job.message || '');
+    if (job.stage) setStage(job.stage);
+    if (job.scenes?.length) renderSceneGrid(job.scenes);
+    if (job.status === 'done') {
+      es.close();
+      showVideo(job.video_url);
+      btn.disabled=false; btn.textContent='▶ Generate Full Video';
+    }
+    if (job.status === 'error') {
+      es.close();
+      showErr(job.error || 'Unknown error');
+      btn.disabled=false; btn.textContent='▶ Generate Full Video';
+    }
+  };
+  es.onerror = () => es.close();
+}
+
+// ─── UI helpers ───────────────────────────────────────────────────────────────
+function setProgress(pct, msg) {
+  document.getElementById('pbar').style.width = pct + '%';
+  document.getElementById('prog-msg').textContent = msg;
+}
+
+const STAGE_MAP = {tts:'p-tts', title:'p-title', scene:'p-scene', concat:'p-concat', done:'p-concat'};
+let completedStages = new Set();
+
+function setStage(stage) {
+  const order = ['p-tts','p-title','p-scene','p-concat'];
+  const cur = STAGE_MAP[stage];
+  const curIdx = order.indexOf(cur);
+  order.forEach((pid, i) => {
+    const el = document.getElementById(pid);
+    if (!el) return;
+    el.className = 'pill';
+    if (stage === 'done' || completedStages.has(pid)) el.classList.add('done');
+    else if (i < curIdx) { el.classList.add('done'); completedStages.add(pid); }
+    else if (pid === cur) el.classList.add('active');
+  });
+}
+
+const STATUS_LABELS = {pending:'Pending', audio:'Recording', image:'Generating', video:'Animating', assembling:'Assembling', done:'Done'};
+
+function renderSceneGrid(scenes) {
+  const grid = document.getElementById('scene-grid');
+  if (grid.children.length !== scenes.length) {
+    grid.innerHTML = '';
+    scenes.forEach((s,i) => {
+      const c = document.createElement('div');
+      c.className = 'sgrid-card';
+      c.id = `sg-${i}`;
+      c.innerHTML = `<img class="sgrid-thumb" id="sg-thumb-${i}" alt="">
+        <div class="sgrid-body">
+          <div class="sgrid-snum">Scene ${s.id}</div>
+          <div class="sgrid-stitle">${s.title || ''}</div>
+          <span class="sgrid-status" id="sg-status-${i}">Pending</span>
+        </div>`;
+      grid.appendChild(c);
+    });
+  }
+  scenes.forEach((s,i) => {
+    const card = document.getElementById(`sg-${i}`);
+    if (!card) return;
+    card.className = `sgrid-card st-${s.status||'pending'}`;
+    document.getElementById(`sg-status-${i}`).textContent = STATUS_LABELS[s.status] || s.status;
+    if (s.thumb_url) {
+      const img = document.getElementById(`sg-thumb-${i}`);
+      if (img.src !== location.origin + s.thumb_url) {
+        img.src = s.thumb_url;
+        img.className = 'sgrid-thumb visible';
+      }
+    }
+  });
+}
+
+function showVideo(url) {
+  const v = document.getElementById('vid-player');
+  v.src = url + '?t=' + Date.now();
+  document.getElementById('result-card').style.display = 'block';
+}
+
+function showErr(msg) {
+  document.getElementById('err-card').style.display = 'block';
+  document.getElementById('err-msg').textContent = msg;
+  document.getElementById('progress-card').style.display = 'none';
+}
+</script>
+</body>
+</html>
