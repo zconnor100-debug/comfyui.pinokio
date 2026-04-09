@@ -15,6 +15,7 @@ module.exports = {
       let gpu_running = kernel.running(__dirname, "start.json")
       let cpu_running = kernel.running(__dirname, "start_cpu.json")
       let prompt_running = kernel.running(__dirname, "start_prompt.json")
+      let narrator_running = kernel.running(__dirname, "start_narrator.json")
       let running = cpu_running || gpu_running
 
       let arr
@@ -94,6 +95,35 @@ module.exports = {
           icon: "fa-solid fa-wand-magic-sparkles",
           text: "Launch Prompt Video Generator",
           href: "start_prompt.json",
+          params: { fullscreen: true, run: true }
+        })
+      }
+
+      // AI Video Narrator
+      if (narrator_running) {
+        arr.push({
+          icon: "fa-solid fa-spin fa-circle-notch",
+          text: "Narrator Running"
+        })
+        arr.push({
+          icon: "fa-solid fa-desktop",
+          text: "Narrator Server",
+          href: "start_narrator.json",
+          params: { fullscreen: true }
+        })
+        if (session && session.narrator_url) {
+          arr.push({
+            icon: "fa-solid fa-microphone",
+            text: "Open AI Video Narrator",
+            href: session.narrator_url,
+            target: "_blank"
+          })
+        }
+      } else {
+        arr.push({
+          icon: "fa-solid fa-microphone",
+          text: "Launch AI Video Narrator",
+          href: "start_narrator.json",
           params: { fullscreen: true, run: true }
         })
       }

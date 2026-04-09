@@ -1,0 +1,31 @@
+{
+  "daemon": true,
+  "run": [{
+    "method": "shell.run",
+    "params": {
+      "venv": "env",
+      "path": "ComfyUI",
+      "message": "pip install edge-tts pillow flask requests -q"
+    }
+  }, {
+    "method": "shell.run",
+    "params": {
+      "venv": "env",
+      "path": "ComfyUI",
+      "message": "python ../narrator.py",
+      "on": [{ "event": "/http:\/\/[0-9.:]+/", "done": true }]
+    }
+  }, {
+    "method": "self.set",
+    "params": {
+      "session.json": {
+        "narrator_url": "{{input.event[0]}}"
+      }
+    }
+  }, {
+    "method": "browser.open",
+    "params": {
+      "uri": "{{self.session.narrator_url}}"
+    }
+  }]
+}
