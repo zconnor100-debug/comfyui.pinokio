@@ -14,6 +14,7 @@ module.exports = {
       let session = (await kernel.loader.load(path.resolve(__dirname, "session.json"))).resolved
       let gpu_running = kernel.running(__dirname, "start.json")
       let cpu_running = kernel.running(__dirname, "start_cpu.json")
+      let prompt_running = kernel.running(__dirname, "start_prompt.json")
       let running = cpu_running || gpu_running
 
       let arr
@@ -66,6 +67,35 @@ module.exports = {
           href: "start_cpu.json",
           params: { fullscreen: true, run: true }
         }]
+      }
+
+      // Prompt-based Video Generator
+      if (prompt_running) {
+        arr.push({
+          icon: "fa-solid fa-spin fa-circle-notch",
+          text: "Prompt Generator Running"
+        })
+        arr.push({
+          icon: "fa-solid fa-desktop",
+          text: "Prompt Generator Server",
+          href: "start_prompt.json",
+          params: { fullscreen: true }
+        })
+        if (session && session.prompt_url) {
+          arr.push({
+            icon: "fa-solid fa-film",
+            text: "Open Prompt Video Generator",
+            href: session.prompt_url,
+            target: "_blank"
+          })
+        }
+      } else {
+        arr.push({
+          icon: "fa-solid fa-wand-magic-sparkles",
+          text: "Launch Prompt Video Generator",
+          href: "start_prompt.json",
+          params: { fullscreen: true, run: true }
+        })
       }
 
       arr = arr.concat([{

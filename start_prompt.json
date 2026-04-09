@@ -1,0 +1,31 @@
+{
+  "daemon": true,
+  "run": [{
+    "method": "shell.run",
+    "params": {
+      "venv": "env",
+      "path": "ComfyUI",
+      "message": "pip install flask requests -q"
+    }
+  }, {
+    "method": "shell.run",
+    "params": {
+      "venv": "env",
+      "path": "ComfyUI",
+      "message": "python ../app.py",
+      "on": [{ "event": "/http:\/\/[0-9.:]+/", "done": true }]
+    }
+  }, {
+    "method": "self.set",
+    "params": {
+      "session.json": {
+        "prompt_url": "{{input.event[0]}}"
+      }
+    }
+  }, {
+    "method": "browser.open",
+    "params": {
+      "uri": "{{self.session.prompt_url}}"
+    }
+  }]
+}

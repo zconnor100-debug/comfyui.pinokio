@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Video Generator</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#08080f;color:#ddd;min-height:100vh}
+    .wrap{max-width:860px;margin:0 auto;padding:40px 20px}
+    h1{font-size:2.2rem;font-weight:800;background:linear-gradient(135deg,#a855f7,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px}
+    .sub{color:#666;margin-bottom:36px;font-size:.9rem}
+    .card{background:#0f0f1a;border:1px solid #1c1c2e;border-radius:16px;padding:28px;margin-bottom:18px}
+    label{display:block;font-size:.78rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px}
+    textarea,input,select{width:100%;background:#08080f;border:1px solid #222236;border-radius:10px;color:#ddd;padding:11px 14px;font-size:.93rem;font-family:inherit;outline:none;transition:border-color .2s}
+    textarea:focus,input:focus,select:focus{border-color:#7c3aed}
+    textarea{resize:vertical;min-height:90px}
+    .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:14px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .field{margin-bottom:14px}
+    .tip{font-size:.75rem;color:#555;margin-top:5px;font-style:italic}
+    .btn{width:100%;padding:15px;background:linear-gradient(135deg,#7c3aed,#2563eb);border:none;border-radius:12px;color:#fff;font-size:1rem;font-weight:700;cursor:pointer;transition:opacity .2s,transform .1s;margin-top:6px;letter-spacing:.02em}
+    .btn:hover{opacity:.88}
+    .btn:active{transform:scale(.99)}
+    .btn:disabled{opacity:.35;cursor:not-allowed}
+    .progress-wrap{display:none}
+    .stages{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+    .stage{padding:4px 13px;border-radius:100px;font-size:.76rem;font-weight:700;background:#1c1c2e;color:#555;border:1px solid #222236;transition:all .3s}
+    .stage.active{background:rgba(124,58,237,.15);color:#a855f7;border-color:rgba(124,58,237,.4)}
+    .stage.done{background:rgba(34,197,94,.1);color:#22c55e;border-color:rgba(34,197,94,.3)}
+    .bar-bg{background:#1c1c2e;border-radius:100px;height:7px;overflow:hidden;margin:10px 0}
+    .bar{height:100%;background:linear-gradient(90deg,#7c3aed,#3b82f6);border-radius:100px;transition:width .5s ease;width:0}
+    .status-msg{font-size:.85rem;color:#777}
+    .result-wrap{display:none}
+    .img-preview{display:none;width:100%;border-radius:10px;margin-bottom:14px;border:1px solid #1c1c2e}
+    video{width:100%;border-radius:10px;background:#000;border:1px solid #1c1c2e}
+    .vid-hint{font-size:.78rem;color:#555;margin-top:8px}
+    .err-card{display:none;background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25)}
+    .err-msg{color:#f87171;font-size:.9rem}
+    .notice{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:12px 16px;font-size:.82rem;color:#93c5fd;margin-bottom:14px}
+    select option{background:#0f0f1a}
+    input[type=range]{padding:0;height:36px;background:none;border:none;cursor:pointer}
+    .range-row{display:flex;align-items:center;gap:10px}
+    .range-row input{flex:1}
+    .range-val{font-size:.85rem;color:#888;min-width:30px;text-align:right}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>AI Video Generator</h1>
+  <p class="sub">Text prompt &rarr; SDXL image &rarr; Stable Video Diffusion &rarr; MP4</p>
+
+  <div class="card" id="status-notice" style="display:none">
+    <p class="err-msg" id="comfyui-status"></p>
+  </div>
+
+  <div class="card">
+    <div class="field">
+      <label>Prompt</label>
+      <textarea id="prompt" placeholder="A majestic eagle soaring over snow-capped mountains at golden hour, cinematic, 8k, photorealistic, detailed feathers, dramatic lighting..."></textarea>
+      <p class="tip">Describe your scene in detail. Style keywords like &quot;cinematic&quot;, &quot;photorealistic&quot;, &quot;8k&quot; improve quality.</p>
+    </div>
+    <div class="field">
+      <label>Negative Prompt</label>
+      <textarea id="negative" style="min-height:60px">blurry, low quality, distorted, watermark, text, cartoon, deformed, bad anatomy, ugly</textarea>
+    </div>
+
+    <div class="grid2">
+      <div>
+        <label>Image Model (SDXL)</label>
+        <select id="img_model">
+          <option value="sd_xl_base_1.0.safetensors">SDXL Base 1.0</option>
+          <option value="sd_xl_turbo_1.0_fp16.safetensors">SDXL Turbo (fast)</option>
+        </select>
+      </div>
+      <div>
+        <label>Video Model (SVD)</label>
+        <select id="vid_model">
+          <option value="svd_xt.safetensors">SVD XT (25 frames)</option>
+          <option value="svd.safetensors">SVD (14 frames)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid3" style="margin-top:14px">
+      <div>
+        <label>Seed</label>
+        <input type="number" id="seed" value="-1" min="-1">
+        <p class="tip">-1 = random each time</p>
+      </div>
+      <div>
+        <label>FPS</label>
+        <input type="number" id="fps" value="6" min="1" max="30">
+      </div>
+      <div>
+        <label>Image Steps</label>
+        <input type="number" id="steps" value="20" min="1" max="60">
+        <p class="tip">Turbo auto-caps at 4</p>
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:14px">
+      <label>Motion Strength <span id="motion_val" style="color:#a855f7;font-style:normal">127</span></label>
+      <div class="range-row">
+        <span style="font-size:.75rem;color:#555">Low</span>
+        <input type="range" id="motion" min="1" max="255" value="127">
+        <span style="font-size:.75rem;color:#555">High</span>
+      </div>
+      <p class="tip">Controls how much the video moves. Higher = more motion but can distort.</p>
+    </div>
+
+    <button class="btn" id="gen-btn" onclick="generate()">&#9654; Generate Video</button>
+  </div>
+
+  <div class="card progress-wrap" id="prog-card">
+    <div class="stages">
+      <span class="stage" id="s1">1 &middot; Image Generation</span>
+      <span class="stage" id="s2">2 &middot; SVD Animation</span>
+      <span class="stage" id="s3">3 &middot; Video Encoding</span>
+    </div>
+    <div class="bar-bg"><div class="bar" id="pbar"></div></div>
+    <p class="status-msg" id="smsg">Starting...</p>
+  </div>
+
+  <div class="card err-card" id="err-card">
+    <p class="err-msg" id="err-msg">Error</p>
+  </div>
+
+  <div class="card result-wrap" id="result-card">
+    <img class="img-preview" id="img-preview" alt="Generated image">
+    <video id="video" controls autoplay loop muted style="display:none"></video>
+    <p class="vid-hint" id="vid-hint"></p>
+  </div>
+</div>
+
+<script>
+let poll = null;
+
+// Load available models on startup
+window.addEventListener('load', async () => {
+  try {
+    const r = await fetch('/models');
+    const data = await r.json();
+    if (data.img && data.img.length) {
+      const sel = document.getElementById('img_model');
+      sel.innerHTML = '';
+      data.img.forEach(m => {
+        const o = document.createElement('option');
+        o.value = m; o.textContent = m;
+        if (m.includes('xl_base')) o.selected = true;
+        sel.appendChild(o);
+      });
+    }
+    if (data.vid && data.vid.length) {
+      const sel = document.getElementById('vid_model');
+      sel.innerHTML = '';
+      data.vid.forEach(m => {
+        const o = document.createElement('option');
+        o.value = m; o.textContent = m;
+        if (m.includes('svd_xt')) o.selected = true;
+        sel.appendChild(o);
+      });
+    }
+  } catch(e) {
+    document.getElementById('status-notice').style.display = 'block';
+    document.getElementById('comfyui-status').textContent =
+      'Warning: Could not reach ComfyUI at http://127.0.0.1:8188. Make sure ComfyUI is running first.';
+  }
+});
+
+document.getElementById('motion').addEventListener('input', function() {
+  document.getElementById('motion_val').textContent = this.value;
+});
+
+async function generate() {
+  const prompt = document.getElementById('prompt').value.trim();
+  if (!prompt) { alert('Please enter a prompt first.'); return; }
+
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true; btn.textContent = 'Generating...';
+  document.getElementById('prog-card').style.display = 'block';
+  document.getElementById('result-card').style.display = 'none';
+  document.getElementById('err-card').style.display = 'none';
+  document.getElementById('img-preview').style.display = 'none';
+  document.getElementById('video').style.display = 'none';
+  setStage(-1); setBar(0, 'Connecting...');
+
+  const body = {
+    prompt,
+    negative: document.getElementById('negative').value,
+    img_model: document.getElementById('img_model').value,
+    vid_model: document.getElementById('vid_model').value,
+    seed: parseInt(document.getElementById('seed').value),
+    motion: parseInt(document.getElementById('motion').value),
+    fps: parseInt(document.getElementById('fps').value),
+    steps: parseInt(document.getElementById('steps').value)
+  };
+
+  try {
+    const r = await fetch('/generate', { method: 'POST',
+      headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (data.error) { showErr(data.error); return; }
+    pollJob(data.job_id);
+  } catch(e) { showErr('Could not reach the generator server: ' + e.message); }
+}
+
+function pollJob(jid) {
+  poll = setInterval(async () => {
+    try {
+      const r = await fetch('/status/' + jid);
+      const d = await r.json();
+      if (d.progress !== undefined) setBar(d.progress, d.message || '');
+      if (d.stage !== undefined) setStage(d.stage);
+      if (d.image_url) {
+        const img = document.getElementById('img-preview');
+        img.src = d.image_url + '?t=' + Date.now();
+        img.style.display = 'block';
+        document.getElementById('result-card').style.display = 'block';
+      }
+      if (d.status === 'done') {
+        clearInterval(poll);
+        const vid = document.getElementById('video');
+        vid.src = d.video_url + '?t=' + Date.now();
+        vid.style.display = 'block';
+        document.getElementById('vid-hint').textContent = 'Right-click the video to save as MP4';
+        document.getElementById('result-card').style.display = 'block';
+        setBar(100, 'Done!'); setStage(3);
+        resetBtn();
+      }
+      if (d.status === 'error') {
+        clearInterval(poll);
+        showErr(d.error || 'Unknown error'); resetBtn();
+      }
+    } catch(e) { console.warn(e); }
+  }, 1500);
+}
+
+function setBar(pct, msg) {
+  document.getElementById('pbar').style.width = pct + '%';
+  document.getElementById('smsg').textContent = msg;
+}
+
+function setStage(n) {
+  ['s1','s2','s3'].forEach((id,i) => {
+    const el = document.getElementById(id);
+    el.className = 'stage';
+    if (i < n) el.classList.add('done');
+    else if (i === n) el.classList.add('active');
+  });
+}
+
+function showErr(msg) {
+  document.getElementById('err-card').style.display = 'block';
+  document.getElementById('err-msg').textContent = msg;
+  document.getElementById('prog-card').style.display = 'none';
+}
+
+function resetBtn() {
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = false; btn.textContent = '▶ Generate Video';
+}
+</script>
+</body>
+</html>
